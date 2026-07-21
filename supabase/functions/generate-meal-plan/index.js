@@ -1,5 +1,6 @@
-import { callAnthropic, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from './utils/shared.js'
-import { calcProfileTargets } from '../../src/lib/calc.js'
+import { corsHeaders } from '../_shared/cors.js'
+import { calcProfileTargets } from '../_shared/calc.js'
+import { callAnthropic, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
 
 const MEAL_PLAN_SCHEMA = `{
   "days": [
@@ -18,13 +19,16 @@ const MEAL_PLAN_SCHEMA = `{
   "shoppingList": ["položka 1", "položka 2"]
 }`
 
-export async function handler(event) {
-  if (event.httpMethod !== 'POST') {
-    return jsonResponse(405, { error: 'Metoda není povolena.' })
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+  if (req.method !== 'POST') {
+    return jsonResponse(405, { error: 'Metoda není povolena.' }, corsHeaders)
   }
 
   try {
-    const { user, supabase } = await verifyAuth(event)
+    const { user, supabase } = await verifyAuth(req)
     await checkRateLimit(supabase, user.id)
 
     const { data: profile, error: profileError } = await supabase
@@ -34,10 +38,11 @@ export async function handler(event) {
       .maybeSingle()
     if (profileError) throw profileError
     if (!profile) {
-      return jsonResponse(400, { error: 'Nejdřív vyplň svůj profil.' })
+      return jsonResponse(400, { error: 'Nejdřív vyplň svůj profil.' }, corsHeaders)
     }
 
-    const days = Math.min(7, Math.max(1, Number(JSON.parse(event.body || '{}').days) || 1))
+    const body = await req.json().catch(() => ({}))
+    const days = Math.min(7, Math.max(1, Number(body.days) || 1))
     const targets = calcProfileTargets({
       sex: profile.sex,
       age: profile.age,
@@ -70,8 +75,8 @@ ${MEAL_PLAN_SCHEMA}`
       .single()
     if (saveError) throw saveError
 
-    return jsonResponse(200, { plan: saved })
+    return jsonResponse(200, { plan: saved }, corsHeaders)
   } catch (err) {
-    return jsonResponse(err.statusCode || 500, { error: err.message || 'Neočekávaná chyba.' })
+    return jsonResponse(err.statusCode || 500, { error: err.message || 'Neočekávaná chyba.' }, corsHeaders)
   }
-}
+})

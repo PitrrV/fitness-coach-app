@@ -1,4 +1,5 @@
-import { callAnthropic, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from './utils/shared.js'
+import { corsHeaders } from '../_shared/cors.js'
+import { callAnthropic, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
 
 const TRAINING_PLAN_SCHEMA = `{
   "days": [
@@ -10,13 +11,16 @@ const TRAINING_PLAN_SCHEMA = `{
   ]
 }`
 
-export async function handler(event) {
-  if (event.httpMethod !== 'POST') {
-    return jsonResponse(405, { error: 'Metoda není povolena.' })
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+  if (req.method !== 'POST') {
+    return jsonResponse(405, { error: 'Metoda není povolena.' }, corsHeaders)
   }
 
   try {
-    const { user, supabase } = await verifyAuth(event)
+    const { user, supabase } = await verifyAuth(req)
     await checkRateLimit(supabase, user.id)
 
     const { data: profile, error: profileError } = await supabase
@@ -26,7 +30,7 @@ export async function handler(event) {
       .maybeSingle()
     if (profileError) throw profileError
     if (!profile) {
-      return jsonResponse(400, { error: 'Nejdřív vyplň svůj profil.' })
+      return jsonResponse(400, { error: 'Nejdřív vyplň svůj profil.' }, corsHeaders)
     }
 
     const prompt = `Sestav tréninkový plán na 4 tréninkové dny v týdnu pro uživatele s cílem
@@ -48,8 +52,8 @@ ${TRAINING_PLAN_SCHEMA}`
       .single()
     if (saveError) throw saveError
 
-    return jsonResponse(200, { plan: saved })
+    return jsonResponse(200, { plan: saved }, corsHeaders)
   } catch (err) {
-    return jsonResponse(err.statusCode || 500, { error: err.message || 'Neočekávaná chyba.' })
+    return jsonResponse(err.statusCode || 500, { error: err.message || 'Neočekávaná chyba.' }, corsHeaders)
   }
-}
+})

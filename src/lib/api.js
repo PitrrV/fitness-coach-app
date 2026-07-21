@@ -1,7 +1,9 @@
 import { supabase } from './supabase'
 
+const FUNCTIONS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
+
 /**
- * Zavolá Netlify Function s auth tokenem aktuální session.
+ * Zavolá Supabase Edge Function s auth tokenem aktuální session.
  * Vyhazuje Error se srozumitelnou zprávou při chybě.
  */
 export async function callFunction(name, body) {
@@ -10,11 +12,12 @@ export async function callFunction(name, body) {
     throw new Error('Nejsi přihlášen/a.')
   }
 
-  const res = await fetch(`/.netlify/functions/${name}`, {
+  const res = await fetch(`${FUNCTIONS_URL}/${name}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.access_token}`,
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
     },
     body: JSON.stringify(body ?? {}),
   })

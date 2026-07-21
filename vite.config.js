@@ -1,11 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
+// GitHub Pages servíruje projektové stránky z /<repo>/, proto base jen pro build.
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  server: {
-    proxy: {
-      '/.netlify/functions': 'http://localhost:9999',
-    },
-  },
-})
+  base: command === 'build' ? '/fitness-coach-app/' : '/',
+}))

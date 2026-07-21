@@ -1,26 +1,28 @@
-// Sdílené utility pro Netlify Functions — auth, rate limit, volání Anthropic API, parsování JSON.
-import { createClient } from '@supabase/supabase-js'
+// Sdílené utility pro Supabase Edge Functions — auth, rate limit, volání
+// Anthropic API, parsování JSON. Deno runtime.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export const DAILY_LIMIT = 15
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6'
 
-export function jsonResponse(statusCode, body) {
-  return {
-    statusCode,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }
+export function jsonResponse(statusCode, body, extraHeaders = {}) {
+  return new Response(JSON.stringify(body), {
+    status: statusCode,
+    headers: { 'Content-Type': 'application/json', ...extraHeaders },
+  })
 }
 
 function adminClient() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+  // SUPABASE_URL a SUPABASE_SERVICE_ROLE_KEY jsou v Edge Functions vždy
+  // dostupné automaticky (Supabase je injectuje, nejde je přepsat ručně).
+  return createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'), {
     auth: { persistSession: false },
   })
 }
 
 /** Ověří JWT z Authorization headeru a vrátí { user, supabase }. Vyhazuje Error při selhání. */
-export async function verifyAuth(event) {
-  const authHeader = event.headers?.authorization || event.headers?.Authorization
+export async function verifyAuth(req) {
+  const authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization')
   const token = authHeader?.replace(/^Bearer\s+/i, '')
   if (!token) {
     const err = new Error('Chybí autentizační token.')
@@ -75,7 +77,7 @@ export async function checkRateLimit(supabase, userId) {
 
 /** Zavolá Anthropic API a vrátí textovou odpověď. */
 export async function callAnthropic({ system, prompt, maxTokens = 4096 }) {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!apiKey) {
     const err = new Error('Server není správně nakonfigurován (chybí API klíč).')
     err.statusCode = 500

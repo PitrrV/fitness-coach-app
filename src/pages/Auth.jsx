@@ -4,11 +4,18 @@ import { supabase } from '../lib/supabase'
 import { Button, Card, Field, inputCls } from '../components/ui'
 import { useToast } from '../components/Toast'
 
+const TITLES = {
+  login: 'Přihlas se ke svému účtu',
+  register: 'Vytvoř si nový účet',
+  forgot: 'Obnov zapomenuté heslo',
+}
+
 export default function Auth() {
-  const [mode, setMode] = useState('login') // 'login' | 'register'
+  const [mode, setMode] = useState('login') // 'login' | 'register' | 'forgot'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sent, setSent] = useState(false)
   const toast = useToast()
 
   async function handleSubmit(e) {
@@ -18,16 +25,29 @@ export default function Auth() {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-      } else {
+      } else if (mode === 'register') {
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
         toast.success('Účet vytvořen. Zkontroluj e-mail pro potvrzení, pokud je vyžadováno.')
+      } else {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin,
+        })
+        if (error) throw error
+        setSent(true)
+        toast.success('Poslali jsme ti e-mail s odkazem pro obnovení hesla.')
       }
     } catch (err) {
-      toast.error(err.message || 'Přihlášení se nezdařilo.')
+      toast.error(err.message || 'Něco se nezdařilo.')
     } finally {
       setLoading(false)
     }
+  }
+
+  function switchMode(next) {
+    setMode(next)
+    setSent(false)
+    setPassword('')
   }
 
   return (
@@ -38,46 +58,73 @@ export default function Auth() {
             <Dumbbell className="h-5 w-5" />
           </div>
           <h1 className="text-lg font-semibold text-text">Fitness AI Coach</h1>
-          <p className="mt-1 text-sm text-muted">
-            {mode === 'login' ? 'Přihlas se ke svému účtu' : 'Vytvoř si nový účet'}
-          </p>
+          <p className="mt-1 text-sm text-muted">{TITLES[mode]}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
-          <Field label="E-mail">
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              className={inputCls}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Field>
-          <Field label="Heslo">
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              className={inputCls}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </Field>
+        {mode === 'forgot' && sent ? (
+          <p className="text-center text-sm text-muted">
+            Zkontroluj svou e-mailovou schránku a klikni na odkaz pro nastavení nového hesla.
+          </p>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            <Field label="E-mail">
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                className={inputCls}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </Field>
 
-          <Button type="submit" className="w-full" loading={loading}>
-            {mode === 'login' ? 'Přihlásit se' : 'Vytvořit účet'}
-          </Button>
-        </form>
+            {mode !== 'forgot' && (
+              <Field label="Heslo">
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  className={inputCls}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </Field>
+            )}
 
-        <button
-          type="button"
-          onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-          className="mt-4 w-full text-center text-sm text-muted hover:text-text"
-        >
-          {mode === 'login' ? 'Nemáš účet? Zaregistruj se' : 'Už máš účet? Přihlas se'}
-        </button>
+            {mode === 'login' && (
+              <button
+                type="button"
+                onClick={() => switchMode('forgot')}
+                className="block text-sm text-muted hover:text-text"
+              >
+                Zapomenuté heslo?
+              </button>
+            )}
+
+            <Button type="submit" className="w-full" loading={loading}>
+              {mode === 'login' ? 'Přihlásit se' : mode === 'register' ? 'Vytvořit účet' : 'Poslat odkaz pro obnovení'}
+            </Button>
+          </form>
+        )}
+
+        {mode === 'forgot' ? (
+          <button
+            type="button"
+            onClick={() => switchMode('login')}
+            className="mt-4 w-full text-center text-sm text-muted hover:text-text"
+          >
+            Zpět na přihlášení
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
+            className="mt-4 w-full text-center text-sm text-muted hover:text-text"
+          >
+            {mode === 'login' ? 'Nemáš účet? Zaregistruj se' : 'Už máš účet? Přihlas se'}
+          </button>
+        )}
       </Card>
     </div>
   )

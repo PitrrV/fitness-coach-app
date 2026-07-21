@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase'
 import { useToast } from './components/Toast'
 import { Skeleton } from './components/Skeleton'
 import Auth from './pages/Auth'
+import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import MealPlan from './pages/MealPlan'
@@ -39,12 +40,14 @@ function AppSkeleton() {
 export default function App() {
   const [session, setSession] = useState(undefined) // undefined = zjišťuje se, null = odhlášen
   const [tab, setTab] = useState('dashboard')
+  const [recovery, setRecovery] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession)
+      if (event === 'PASSWORD_RECOVERY') setRecovery(true)
     })
     return () => sub.subscription.unsubscribe()
   }, [])
@@ -55,6 +58,7 @@ export default function App() {
   }
 
   if (session === undefined) return <AppSkeleton />
+  if (recovery) return <ResetPassword onDone={() => setRecovery(false)} />
   if (!session) return <Auth />
 
   const active = TABS.find((t) => t.id === tab) ?? TABS[0]

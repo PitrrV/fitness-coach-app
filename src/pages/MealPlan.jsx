@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChefHat, RefreshCw, ShoppingCart } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { callFunction } from '../lib/api'
@@ -6,10 +6,14 @@ import { Button, Card, EmptyState, Eyebrow } from '../components/ui'
 import { useToast } from '../components/Toast'
 import { ListSkeleton } from '../components/Skeleton'
 
+const DAY_OPTIONS = [1, 3, 7]
+
 export default function MealPlan({ user }) {
   const [plan, setPlan] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [daysToGenerate, setDaysToGenerate] = useState(1)
+  const [activeDay, setActiveDay] = useState(1)
   const toast = useToast()
 
   useEffect(() => {
@@ -24,7 +28,10 @@ export default function MealPlan({ user }) {
         .maybeSingle()
       if (!active) return
       if (error) toast.error('Nepodařilo se načíst jídelníček.')
-      else if (data) setPlan(data)
+      else if (data) {
+        setPlan(data)
+        setActiveDay(1)
+      }
       setLoading(false)
     }
     load()
@@ -36,8 +43,9 @@ export default function MealPlan({ user }) {
   async function handleGenerate() {
     setGenerating(true)
     try {
-      const result = await callFunction('generate-meal-plan', { days: 1 })
+      const result = await callFunction('generate-meal-plan', { days: daysToGenerate })
       setPlan(result.plan)
+      setActiveDay(1)
       toast.success('Jídelníček vygenerován.')
     } catch (err) {
       toast.error(err.message || 'Generování jídelníčku se nezdařilo.')
@@ -46,19 +54,36 @@ export default function MealPlan({ user }) {
     }
   }
 
-  if (loading) return <ListSkeleton rows={3} />
-
   const days = plan?.plan_json?.days ?? []
   const shoppingList = plan?.plan_json?.shoppingList ?? []
+  const currentDay = useMemo(() => days.find((d) => d.day === activeDay) ?? days[0], [days, activeDay])
+
+  if (loading) return <ListSkeleton rows={3} />
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Eyebrow>Jídelníček</Eyebrow>
-        <Button variant="secondary" onClick={handleGenerate} loading={generating}>
-          <RefreshCw className="h-4 w-4" />
-          {plan ? 'Přegenerovat' : 'Vygenerovat'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-xl border border-border p-0.5">
+            {DAY_OPTIONS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setDaysToGenerate(d)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                  daysToGenerate === d ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
+                }`}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+          <Button variant="secondary" onClick={handleGenerate} loading={generating}>
+            <RefreshCw className="h-4 w-4" />
+            {plan ? 'Přegenerovat' : 'Vygenerovat'}
+          </Button>
+        </div>
       </div>
 
       {!plan && !generating && (
@@ -70,11 +95,27 @@ export default function MealPlan({ user }) {
         />
       )}
 
-      {days.map((day) => (
-        <Card key={day.day}>
-          <Eyebrow className="mb-3">Den {day.day}</Eyebrow>
+      {days.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto">
+          {days.map((day) => (
+            <button
+              key={day.day}
+              onClick={() => setActiveDay(day.day)}
+              className={`shrink-0 rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                day.day === currentDay?.day ? 'bg-accent/15 text-accent' : 'bg-surface text-muted hover:text-text'
+              }`}
+            >
+              Den {day.day}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {currentDay && (
+        <Card>
+          <Eyebrow className="mb-3">Den {currentDay.day}</Eyebrow>
           <div className="space-y-3">
-            {day.meals?.map((meal, i) => (
+            {currentDay.meals?.map((meal, i) => (
               <div key={i} className="rounded-xl border border-border p-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold text-text">{meal.name}</div>
@@ -90,13 +131,14 @@ export default function MealPlan({ user }) {
               </div>
             ))}
           </div>
-          {day.totals && (
+          {currentDay.totals && (
             <div className="mt-3 text-sm text-muted">
-              Celkem: {day.totals.kcal} kcal · B {day.totals.protein}g · T {day.totals.fat}g · S {day.totals.carbs}g
+              Celkem: {currentDay.totals.kcal} kcal · B {currentDay.totals.protein}g · T {currentDay.totals.fat}g · S{' '}
+              {currentDay.totals.carbs}g
             </div>
           )}
         </Card>
-      ))}
+      )}
 
       {shoppingList.length > 0 && (
         <Card>

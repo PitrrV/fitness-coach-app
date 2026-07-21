@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { Button, Card, EmptyState, Eyebrow, Field, inputCls } from '../components/ui'
 import { useToast } from '../components/Toast'
 import { ListSkeleton } from '../components/Skeleton'
+import CheckInDetailModal from '../components/CheckInDetailModal'
 
 const emptyForm = {
   weightKg: '',
@@ -22,6 +23,7 @@ export default function CheckIn({ user }) {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState(null)
   const toast = useToast()
 
   async function loadHistory() {
@@ -200,7 +202,11 @@ export default function CheckIn({ user }) {
       ) : (
         <div className="space-y-2.5">
           {history.map((row) => (
-            <Card key={row.id} className="flex items-center justify-between">
+            <Card
+              key={row.id}
+              onClick={() => setSelected(row)}
+              className="flex cursor-pointer items-center justify-between hover:border-accent/60"
+            >
               <div>
                 <div className="text-sm font-semibold text-text">{row.date}</div>
                 <div className="text-xs text-muted">
@@ -212,6 +218,8 @@ export default function CheckIn({ user }) {
           ))}
         </div>
       )}
+
+      {selected && <CheckInDetailModal checkIn={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }

@@ -5,12 +5,14 @@ import { callFunction } from '../lib/api'
 import { Button, Card, EmptyState, Eyebrow } from '../components/ui'
 import { useToast } from '../components/Toast'
 import { ListSkeleton } from '../components/Skeleton'
+import { useChecklist } from '../lib/useChecklist'
 
 export default function TrainingPlan({ user }) {
   const [plan, setPlan] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const toast = useToast()
+  const [checkedSets, toggleSet] = useChecklist(`training-checks-${plan?.id ?? 'none'}`)
 
   useEffect(() => {
     let active = true
@@ -76,14 +78,42 @@ export default function TrainingPlan({ user }) {
             {day.focus && <span className="text-xs text-muted">{day.focus}</span>}
           </div>
           <div className="space-y-2">
-            {day.exercises?.map((ex, j) => (
-              <div key={j} className="flex items-center justify-between rounded-xl border border-border p-3">
-                <div className="text-sm text-text">{ex.name}</div>
-                <div className="text-xs text-muted">
-                  {ex.sets} × {ex.reps}
+            {day.exercises?.map((ex, j) => {
+              const setCount = Number(ex.sets) || 0
+              return (
+                <div key={j} className="rounded-xl border border-border p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-text">{ex.name}</div>
+                    <div className="text-xs text-muted">
+                      {ex.sets} × {ex.reps}
+                    </div>
+                  </div>
+                  {setCount > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {Array.from({ length: setCount }).map((_, setIndex) => {
+                        const itemKey = `${i}-${j}-${setIndex}`
+                        const done = !!checkedSets[itemKey]
+                        return (
+                          <button
+                            key={setIndex}
+                            type="button"
+                            onClick={() => toggleSet(itemKey)}
+                            aria-pressed={done}
+                            className={`flex h-7 w-7 items-center justify-center rounded-lg border text-xs font-semibold transition ${
+                              done
+                                ? 'border-teal bg-teal/15 text-teal'
+                                : 'border-border text-muted hover:border-accent/60 hover:text-text'
+                            }`}
+                          >
+                            {setIndex + 1}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </Card>
       ))}

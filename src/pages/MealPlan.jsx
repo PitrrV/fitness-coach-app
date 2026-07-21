@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChefHat, RefreshCw, ShoppingCart } from 'lucide-react'
+import { CheckSquare, ChefHat, RefreshCw, Square, ShoppingCart } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { callFunction } from '../lib/api'
 import { Button, Card, EmptyState, Eyebrow } from '../components/ui'
 import { useToast } from '../components/Toast'
 import { ListSkeleton } from '../components/Skeleton'
+import { useChecklist } from '../lib/useChecklist'
 
 const DAY_OPTIONS = [1, 3, 7]
 
@@ -15,6 +16,7 @@ export default function MealPlan({ user }) {
   const [daysToGenerate, setDaysToGenerate] = useState(1)
   const [activeDay, setActiveDay] = useState(1)
   const toast = useToast()
+  const [checkedItems, toggleItem] = useChecklist(`meal-checks-${plan?.id ?? 'none'}`)
 
   useEffect(() => {
     let active = true
@@ -146,12 +148,26 @@ export default function MealPlan({ user }) {
             <ShoppingCart className="h-3.5 w-3.5" />
             Nákupní seznam
           </Eyebrow>
-          <ul className="space-y-1.5">
-            {shoppingList.map((item, i) => (
-              <li key={i} className="text-sm text-text">
-                {item}
-              </li>
-            ))}
+          <ul className="space-y-1">
+            {shoppingList.map((item, i) => {
+              const done = !!checkedItems[i]
+              return (
+                <li key={i}>
+                  <button
+                    type="button"
+                    onClick={() => toggleItem(i)}
+                    className="flex w-full items-center gap-2 rounded-lg px-1 py-1.5 text-left hover:bg-white/5"
+                  >
+                    {done ? (
+                      <CheckSquare className="h-4 w-4 shrink-0 text-teal" />
+                    ) : (
+                      <Square className="h-4 w-4 shrink-0 text-muted" />
+                    )}
+                    <span className={`text-sm ${done ? 'text-muted line-through' : 'text-text'}`}>{item}</span>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         </Card>
       )}

@@ -102,6 +102,10 @@ export default function App() {
 
       <main className="mx-auto max-w-2xl px-4 py-5">
         <ActivePage user={session.user} onSaved={() => setTab('dashboard')} />
+        <p className="mt-8 text-center text-xs text-muted">
+          Fitness AI Coach neslouží jako náhrada lékařské péče. Před výraznější změnou stravy nebo
+          tréninku se poraď s lékařem.
+        </p>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface/95 backdrop-blur sm:hidden">

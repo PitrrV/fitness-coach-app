@@ -14,6 +14,7 @@ export default function Auth() {
   const [mode, setMode] = useState('login') // 'login' | 'register' | 'forgot'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [healthConsent, setHealthConsent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
   const toast = useToast()
@@ -26,7 +27,17 @@ export default function Auth() {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
       } else if (mode === 'register') {
-        const { error } = await supabase.auth.signUp({ email, password })
+        if (!healthConsent) {
+          toast.error('Pro registraci je potřeba souhlasit se zpracováním zdravotních údajů.')
+          return
+        }
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { health_data_consent: true, health_data_consent_at: new Date().toISOString() },
+          },
+        })
         if (error) throw error
         toast.success('Účet vytvořen. Zkontroluj e-mail pro potvrzení, pokud je vyžadováno.')
       } else {
@@ -102,10 +113,33 @@ export default function Auth() {
               </button>
             )}
 
+            {mode === 'register' && (
+              <label className="flex items-start gap-2.5 text-sm text-muted">
+                <input
+                  type="checkbox"
+                  required
+                  checked={healthConsent}
+                  onChange={(e) => setHealthConsent(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-border bg-ink text-accent accent-accent"
+                />
+                <span>
+                  Souhlasím se zpracováním svých zdravotních a tělesných údajů (váha, tělesný tuk, míry,
+                  fotky z check-inů) za účelem poskytování služby.
+                </span>
+              </label>
+            )}
+
             <Button type="submit" className="w-full" loading={loading}>
               {mode === 'login' ? 'Přihlásit se' : mode === 'register' ? 'Vytvořit účet' : 'Poslat odkaz pro obnovení'}
             </Button>
           </form>
+        )}
+
+        {mode === 'register' && (
+          <p className="mt-4 text-center text-xs text-muted">
+            Fitness AI Coach neslouží jako náhrada lékařské péče. Před výraznější změnou stravy nebo tréninku
+            se poraď s lékařem.
+          </p>
         )}
 
         {mode === 'forgot' ? (

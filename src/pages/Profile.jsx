@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { callFunction } from '../lib/api'
 import { ACTIVITY_LEVELS, GOALS, calcProfileTargets } from '../lib/calc'
 import { Button, Card, Eyebrow, Field, MacroSplitBar, Metric, MiniMacro, inputCls } from '../components/ui'
 import { useToast } from '../components/Toast'
@@ -20,6 +22,8 @@ export default function Profile({ user, onSaved }) {
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
@@ -93,6 +97,18 @@ export default function Profile({ user, onSaved }) {
       toast.error(err.message || 'Uložení profilu se nezdařilo.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true)
+    try {
+      await callFunction('delete-account', {})
+      toast.success('Účet a všechna data byla smazána.')
+      await supabase.auth.signOut()
+    } catch (err) {
+      toast.error(err.message || 'Smazání účtu se nezdařilo.')
+      setDeleting(false)
     }
   }
 
@@ -211,6 +227,33 @@ export default function Profile({ user, onSaved }) {
           </div>
         </Card>
       )}
+
+      <Card className="border-danger/40">
+        <Eyebrow className="mb-3">Nebezpečná zóna</Eyebrow>
+        {!confirmDelete ? (
+          <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+            Smazat můj účet a všechna data
+          </Button>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex gap-2 rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm text-text">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" />
+              <p>
+                Tohle nevratně smaže tvůj účet, profil, check-iny (včetně fotek), jídelníčky i tréninkové
+                plány. Fakt to chceš udělat?
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="danger" onClick={handleDeleteAccount} loading={deleting} className="flex-1">
+                Ano, smazat vše
+              </Button>
+              <Button variant="secondary" onClick={() => setConfirmDelete(false)} disabled={deleting} className="flex-1">
+                Zrušit
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
     </div>
   )
 }

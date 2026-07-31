@@ -27,6 +27,40 @@ const MEAL_PLAN_SCHEMA = `{
   "shoppingList": ["položka 1", "položka 2"]
 }`
 
+const TOLERANCE = 0.08 // ±8 % od cílových kalorií za den
+
+/** Zkontroluje, jestli je součet kalorií KAŽDÉHO dne v toleranci od cíle. */
+function isWithinTolerance(planJson, targetCalories) {
+  const days = planJson?.days
+  if (!Array.isArray(days) || days.length === 0) return false
+  return days.every((d) => {
+    const kcal = d?.totals?.kcal
+    return typeof kcal === 'number' && Math.abs(kcal - targetCalories) / targetCalories <= TOLERANCE
+  })
+}
+
+function buildPrompt({ days, profile, targets, preferences, bodyComposition, correction }) {
+  const min = Math.round(targets.calories * (1 - TOLERANCE))
+  const max = Math.round(targets.calories * (1 + TOLERANCE))
+  return `Sestav jídelníček na ${days} ${days === 1 ? 'den' : days < 5 ? 'dny' : 'dní'} pro uživatele:
+- cíl: ${profile.goal}
+- denní kalorie: ${targets.calories} kcal
+- makra: bílkoviny ${targets.protein.g} g, tuky ${targets.fat.g} g, sacharidy ${targets.carbs.g} g
+${preferences}${bodyComposition}
+DŮLEŽITÉ: Součet kalorií (totals.kcal) za KAŽDÝ jednotlivý den musí být v rozmezí ${min}–${max} kcal.
+Než odpovíš, u každého dne sečti kalorie všech jídel a uprav gramáže tak, aby součet do rozmezí
+skutečně spadal — teprve pak do "totals" daného dne napiš přepočítaný součet.
+
+Používej běžně dostupné potraviny v ČR. Rozděl každý den na 3–4 jídla, u každé položky uveď
+gramáž. Přidej souhrnný nákupní seznam za všechny dny (bez duplicit). Odpověz VÝHRADNĚ platným
+JSON přesně v této struktuře, bez dalšího textu:
+${MEAL_PLAN_SCHEMA}${
+    correction
+      ? `\n\nPředchozí pokus měl součet kalorií u některých dnů mimo rozmezí ${min}–${max} kcal. Uprav gramáže a přepočítej totals znovu, tentokrát přesně.`
+      : ''
+  }`
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -67,21 +101,22 @@ Deno.serve(async (req) => {
       goal: profile.goal,
     })
 
-    const prompt = `Sestav jídelníček na ${days} ${days === 1 ? 'den' : days < 5 ? 'dny' : 'dní'} pro uživatele:
-- cíl: ${profile.goal}
-- denní kalorie: ${targets.calories} kcal
-- makra: bílkoviny ${targets.protein.g} g, tuky ${targets.fat.g} g, sacharidy ${targets.carbs.g} g
-${buildPreferencesPrompt(profile)}${buildBodyCompositionPrompt(checkIns ?? [])}
-Používej běžně dostupné potraviny v ČR. Rozděl každý den na 3–4 jídla, u každé položky uveď
-gramáž. Přidej souhrnný nákupní seznam za všechny dny (bez duplicit). Odpověz VÝHRADNĚ platným
-JSON přesně v této struktuře, bez dalšího textu:
-${MEAL_PLAN_SCHEMA}`
+    const preferences = buildPreferencesPrompt(profile)
+    const bodyComposition = buildBodyCompositionPrompt(checkIns ?? [])
+    const system = 'Jsi výživový poradce. Odpovídáš vždy pouze validním JSON bez dalšího komentáře.'
 
-    const text = await callAI({
-      system: 'Jsi výživový poradce. Odpovídáš vždy pouze validním JSON bez dalšího komentáře.',
-      prompt,
-    })
-    const planJson = parseAIJson(text)
+    let planJson = parseAIJson(
+      await callAI({ system, prompt: buildPrompt({ days, profile, targets, preferences, bodyComposition }) })
+    )
+
+    if (!isWithinTolerance(planJson, targets.calories)) {
+      planJson = parseAIJson(
+        await callAI({
+          system,
+          prompt: buildPrompt({ days, profile, targets, preferences, bodyComposition, correction: true }),
+        })
+      )
+    }
 
     const { data: saved, error: saveError } = await supabase
       .from('meal_plans')

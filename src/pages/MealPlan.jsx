@@ -7,13 +7,13 @@ import { useToast } from '../components/Toast'
 import { ListSkeleton } from '../components/Skeleton'
 import { useChecklist } from '../lib/useChecklist'
 
-const DAY_OPTIONS = [1, 3, 7]
+const WEEKDAYS = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle']
+const WEEKDAYS_SHORT = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 
 export default function MealPlan({ user }) {
   const [plan, setPlan] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
-  const [daysToGenerate, setDaysToGenerate] = useState(1)
   const [activeDay, setActiveDay] = useState(1)
   const toast = useToast()
   const [checkedItems, toggleItem] = useChecklist(`meal-checks-${plan?.id ?? 'none'}`)
@@ -45,7 +45,7 @@ export default function MealPlan({ user }) {
   async function handleGenerate() {
     setGenerating(true)
     try {
-      const result = await callFunction('generate-meal-plan', { days: daysToGenerate })
+      const result = await callFunction('generate-meal-plan', {})
       setPlan(result.plan)
       setActiveDay(1)
       toast.success('Jídelníček vygenerován.')
@@ -65,34 +65,18 @@ export default function MealPlan({ user }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Eyebrow>Jídelníček</Eyebrow>
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-xl border border-border p-0.5">
-            {DAY_OPTIONS.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDaysToGenerate(d)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
-                  daysToGenerate === d ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
-                }`}
-              >
-                {d}d
-              </button>
-            ))}
-          </div>
-          <Button variant="secondary" onClick={handleGenerate} loading={generating}>
-            <RefreshCw className="h-4 w-4" />
-            {plan ? 'Přegenerovat' : 'Vygenerovat'}
-          </Button>
-        </div>
+        <Eyebrow>Jídelníček na týden (Po–Ne)</Eyebrow>
+        <Button variant="secondary" onClick={handleGenerate} loading={generating}>
+          <RefreshCw className="h-4 w-4" />
+          {plan ? 'Přegenerovat' : 'Vygenerovat'}
+        </Button>
       </div>
 
       {!plan && !generating && (
         <EmptyState
           icon={ChefHat}
           title="Zatím nemáš jídelníček"
-          description="Nech si ho vygenerovat na míru podle tvého profilu a cílů."
+          description="Nech si ho vygenerovat na míru podle tvého profilu a cílů — appka vždy sestaví celý týden, pondělí až neděle."
           action={<Button onClick={handleGenerate}>Vygenerovat jídelníček</Button>}
         />
       )}
@@ -107,7 +91,7 @@ export default function MealPlan({ user }) {
                 day.day === currentDay?.day ? 'bg-accent/15 text-accent' : 'bg-surface text-muted hover:text-text'
               }`}
             >
-              Den {day.day}
+              {WEEKDAYS_SHORT[day.day - 1] ?? `Den ${day.day}`}
             </button>
           ))}
         </div>
@@ -115,7 +99,7 @@ export default function MealPlan({ user }) {
 
       {currentDay && (
         <Card>
-          <Eyebrow className="mb-3">Den {currentDay.day}</Eyebrow>
+          <Eyebrow className="mb-3">{WEEKDAYS[currentDay.day - 1] ?? `Den ${currentDay.day}`}</Eyebrow>
           <div className="space-y-3">
             {currentDay.meals?.map((meal, i) => (
               <div key={i} className="rounded-xl border border-border p-3">

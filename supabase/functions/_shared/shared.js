@@ -75,8 +75,8 @@ export async function checkRateLimit(supabase, userId) {
   if (updateError) throw updateError
 }
 
-/** Zavolá OpenAI API a vrátí textovou odpověď. */
-export async function callAI({ system, prompt, maxTokens = 4096 }) {
+/** Zavolá OpenAI Chat Completions API a vrátí kompletní zprávu asistenta (včetně tool_calls). */
+export async function callAIRaw({ messages, tools, maxTokens = 4096 }) {
   const apiKey = Deno.env.get('OPENAI_API_KEY')
   if (!apiKey) {
     const err = new Error('Server není správně nakonfigurován (chybí API klíč).')
@@ -93,10 +93,8 @@ export async function callAI({ system, prompt, maxTokens = 4096 }) {
     body: JSON.stringify({
       model: OPENAI_MODEL,
       max_tokens: maxTokens,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: prompt },
-      ],
+      messages,
+      ...(tools ? { tools, tool_choice: 'auto' } : {}),
     }),
   })
 
@@ -108,7 +106,61 @@ export async function callAI({ system, prompt, maxTokens = 4096 }) {
   }
 
   const data = await res.json()
-  return data.choices?.[0]?.message?.content ?? ''
+  const message = data.choices?.[0]?.message
+  if (!message) {
+    const err = new Error('AI nevrátila žádnou odpověď.')
+    err.statusCode = 502
+    throw err
+  }
+  return message
+}
+
+/** Zavolá OpenAI API a vrátí jen textovou odpověď (bez function calling). */
+export async function callAI({ system, prompt, maxTokens = 4096 }) {
+  const message = await callAIRaw({
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: prompt },
+    ],
+    maxTokens,
+  })
+  return message.content ?? ''
+}
+
+const ALLERGEN_LABELS = {
+  lepek: 'lepek (obiloviny)',
+  korysi: 'korýši',
+  vejce: 'vejce',
+  ryby: 'ryby',
+  arasidy: 'arašídy',
+  soja: 'sója',
+  mleko: 'mléko (laktóza)',
+  orechy: 'skořápkové plody (ořechy)',
+  celer: 'celer',
+  horcice: 'hořčice',
+  sezam: 'sezamová semena',
+  siriciny: 'oxid siřičitý a siřičitany',
+  vlci_bob: 'vlčí bob (lupina)',
+  mekkysi: 'měkkýši',
+}
+
+/** Sestaví blok textu s rozpočtem, preferencemi a alergeny z profilu pro vložení do promptu. */
+export function buildPreferencesPrompt(profile) {
+  const lines = []
+  if (profile.budget_czk_week) {
+    lines.push(`- maximální rozpočet na jídlo: ${profile.budget_czk_week} Kč/týden — nepřekračuj ho`)
+  }
+  if (profile.favorite_foods) {
+    lines.push(`- oblíbené potraviny (zařazuj častěji): ${profile.favorite_foods}`)
+  }
+  if (profile.disliked_foods) {
+    lines.push(`- nechtěné potraviny (nepoužívej): ${profile.disliked_foods}`)
+  }
+  if (profile.allergens?.length) {
+    const labels = profile.allergens.map((a) => ALLERGEN_LABELS[a] ?? a).join(', ')
+    lines.push(`- alergeny/intolerance (bezpodmínečně vynech): ${labels}`)
+  }
+  return lines.length ? `\nDalší požadavky uživatele:\n${lines.join('\n')}\n` : ''
 }
 
 /** Vyextrahuje a naparsuje JSON z textové odpovědi AI (i pokud je obalený v ```json bloku). */

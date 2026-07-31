@@ -1,6 +1,6 @@
 import { corsHeaders } from '../_shared/cors.js'
 import { calcProfileTargets } from '../_shared/calc.js'
-import { callAI, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
+import { buildPreferencesPrompt, callAI, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
 
 const MEAL_PLAN_SCHEMA = `{
   "days": [
@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
 - cíl: ${profile.goal}
 - denní kalorie: ${targets.calories} kcal
 - makra: bílkoviny ${targets.protein.g} g, tuky ${targets.fat.g} g, sacharidy ${targets.carbs.g} g
-
+${buildPreferencesPrompt(profile)}
 Používej běžně dostupné potraviny v ČR. Rozděl každý den na 3–4 jídla, u každé položky uveď
 gramáž. Přidej souhrnný nákupní seznam za všechny dny (bez duplicit). Odpověz VÝHRADNĚ platným
 JSON přesně v této struktuře, bez dalšího textu:

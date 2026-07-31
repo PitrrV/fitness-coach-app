@@ -12,9 +12,19 @@ create table if not exists public.profiles (
   activity_level text not null default 'moderate',
   goal text not null default 'maintain',
   target_weight_kg numeric,
+  budget_czk_week numeric,
+  favorite_foods text,
+  disliked_foods text,
+  allergens text[] not null default '{}',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Idempotentní přidání sloupců pro už existující databáze (migrace ze starší verze schématu).
+alter table public.profiles add column if not exists budget_czk_week numeric;
+alter table public.profiles add column if not exists favorite_foods text;
+alter table public.profiles add column if not exists disliked_foods text;
+alter table public.profiles add column if not exists allergens text[] not null default '{}';
 
 alter table public.profiles enable row level security;
 
@@ -122,6 +132,27 @@ alter table public.ai_usage enable row level security;
 drop policy if exists "ai_usage_select_own" on public.ai_usage;
 create policy "ai_usage_select_own" on public.ai_usage
   for select using (auth.uid() = user_id);
+
+-- ─── chat_messages (historie konverzace s AI koučem) ────────────────────────
+create table if not exists public.chat_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists chat_messages_user_created_idx on public.chat_messages (user_id, created_at);
+
+alter table public.chat_messages enable row level security;
+
+drop policy if exists "chat_messages_select_own" on public.chat_messages;
+create policy "chat_messages_select_own" on public.chat_messages
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "chat_messages_insert_own" on public.chat_messages;
+create policy "chat_messages_insert_own" on public.chat_messages
+  for insert with check (auth.uid() = user_id);
 
 -- ─── Storage: measurement-photos (soukromý bucket) ─────────────────────────
 insert into storage.buckets (id, name, public)

@@ -14,6 +14,24 @@ export const GOALS = {
   bulk: { label: 'Nabírání (bulk)', calorieAdjust: 300, proteinPerKg: 1.8 },
 }
 
+/** 14 alergenů dle EU nařízení 1169/2011 — používá se jako výběr v profilu. */
+export const ALLERGENS = [
+  { value: 'lepek', label: 'Lepek (obiloviny)' },
+  { value: 'korysi', label: 'Korýši' },
+  { value: 'vejce', label: 'Vejce' },
+  { value: 'ryby', label: 'Ryby' },
+  { value: 'arasidy', label: 'Arašídy' },
+  { value: 'soja', label: 'Sója' },
+  { value: 'mleko', label: 'Mléko (laktóza)' },
+  { value: 'orechy', label: 'Skořápkové plody (ořechy)' },
+  { value: 'celer', label: 'Celer' },
+  { value: 'horcice', label: 'Hořčice' },
+  { value: 'sezam', label: 'Sezamová semena' },
+  { value: 'siriciny', label: 'Oxid siřičitý a siřičitany' },
+  { value: 'vlci_bob', label: 'Vlčí bob (lupina)' },
+  { value: 'mekkysi', label: 'Měkkýši' },
+]
+
 /** BMR podle Mifflin–St Jeor. sex: 'male' | 'female' */
 export function calcBMR({ sex, weightKg, heightCm, age }) {
   const base = 10 * weightKg + 6.25 * heightCm - 5 * age

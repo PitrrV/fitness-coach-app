@@ -3,6 +3,7 @@ import { CalendarCheck, ChefHat, Dumbbell, LayoutDashboard, LogOut, User } from 
 import { supabase } from './lib/supabase'
 import { useToast } from './components/Toast'
 import { Skeleton } from './components/Skeleton'
+import ChatCoach from './components/ChatCoach'
 import Auth from './pages/Auth'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
@@ -122,6 +123,8 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      <ChatCoach user={session.user} />
     </div>
   )
 }

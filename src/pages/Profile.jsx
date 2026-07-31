@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { callFunction } from '../lib/api'
-import { ACTIVITY_LEVELS, GOALS, calcProfileTargets } from '../lib/calc'
+import { ACTIVITY_LEVELS, ALLERGENS, GOALS, calcProfileTargets } from '../lib/calc'
 import { Button, Card, Eyebrow, Field, MacroSplitBar, Metric, MiniMacro, inputCls } from '../components/ui'
 import { useToast } from '../components/Toast'
 import { ListSkeleton } from '../components/Skeleton'
@@ -16,6 +16,10 @@ const emptyForm = {
   activityLevel: 'moderate',
   goal: 'maintain',
   targetWeightKg: '',
+  budgetCzkWeek: '',
+  favoriteFoods: '',
+  dislikedFoods: '',
+  allergens: [],
 }
 
 export default function Profile({ user, onSaved }) {
@@ -47,6 +51,10 @@ export default function Profile({ user, onSaved }) {
           activityLevel: data.activity_level ?? 'moderate',
           goal: data.goal ?? 'maintain',
           targetWeightKg: data.target_weight_kg ?? '',
+          budgetCzkWeek: data.budget_czk_week ?? '',
+          favoriteFoods: data.favorite_foods ?? '',
+          dislikedFoods: data.disliked_foods ?? '',
+          allergens: data.allergens ?? [],
         })
       }
       setLoading(false)
@@ -59,6 +67,15 @@ export default function Profile({ user, onSaved }) {
 
   function update(key, value) {
     setForm((f) => ({ ...f, [key]: value }))
+  }
+
+  function toggleAllergen(value) {
+    setForm((f) => ({
+      ...f,
+      allergens: f.allergens.includes(value)
+        ? f.allergens.filter((a) => a !== value)
+        : [...f.allergens, value],
+    }))
   }
 
   const isComplete = form.age && form.heightCm && form.weightKg
@@ -87,6 +104,10 @@ export default function Profile({ user, onSaved }) {
         activity_level: form.activityLevel,
         goal: form.goal,
         target_weight_kg: form.targetWeightKg ? Number(form.targetWeightKg) : null,
+        budget_czk_week: form.budgetCzkWeek ? Number(form.budgetCzkWeek) : null,
+        favorite_foods: form.favoriteFoods || null,
+        disliked_foods: form.dislikedFoods || null,
+        allergens: form.allergens,
         updated_at: new Date().toISOString(),
       }
       const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'user_id' })
@@ -201,6 +222,62 @@ export default function Profile({ user, onSaved }) {
               value={form.targetWeightKg}
               onChange={(e) => update('targetWeightKg', e.target.value)}
             />
+          </Field>
+
+          <div className="border-t border-border pt-3.5">
+            <Eyebrow className="mb-3">Rozpočet a preference jídla</Eyebrow>
+          </div>
+
+          <Field
+            label="Maximální rozpočet na jídlo (Kč/týden)"
+            hint="Nepovinné — AI se ho pokusí dodržet při sestavování jídelníčku"
+          >
+            <input
+              type="number"
+              min={0}
+              step="10"
+              className={inputCls}
+              value={form.budgetCzkWeek}
+              onChange={(e) => update('budgetCzkWeek', e.target.value)}
+            />
+          </Field>
+
+          <Field label="Oblíbené potraviny" hint="Nepovinné — co máš rád/a a AI to může zařazovat častěji">
+            <textarea
+              rows={2}
+              className={inputCls}
+              value={form.favoriteFoods}
+              onChange={(e) => update('favoriteFoods', e.target.value)}
+            />
+          </Field>
+
+          <Field label="Nechtěné potraviny" hint="Nepovinné — čemu se má AI vyhnout">
+            <textarea
+              rows={2}
+              className={inputCls}
+              value={form.dislikedFoods}
+              onChange={(e) => update('dislikedFoods', e.target.value)}
+            />
+          </Field>
+
+          <Field label="Alergeny a intolerance" hint="Vyber vše, co se má v jídelníčku vynechat">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {ALLERGENS.map((a) => {
+                const active = form.allergens.includes(a.value)
+                return (
+                  <button
+                    key={a.value}
+                    type="button"
+                    onClick={() => toggleAllergen(a.value)}
+                    className={`rounded-xl border px-2.5 py-1.5 text-left text-xs font-medium transition ${
+                      active ? 'border-accent/60 bg-accent/15 text-accent' : 'border-border text-muted hover:text-text'
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                )
+              })}
+            </div>
           </Field>
 
           <Button type="submit" className="w-full" loading={saving}>

@@ -3,7 +3,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export const DAILY_LIMIT = 15
-const OPENAI_MODEL = 'gpt-4o'
+// gpt-5.6-luna: levný model optimalizovaný pro cost-sensitive workloady, podporuje i obrázky
+// (vision) — zvládne tedy i OCR sken, ne jen text. Výrazně levnější než dřívější gpt-4o.
+const OPENAI_MODEL = 'gpt-5.6-luna'
 
 export function jsonResponse(statusCode, body, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {

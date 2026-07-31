@@ -163,6 +163,29 @@ export function buildPreferencesPrompt(profile) {
   return lines.length ? `\nDalší požadavky uživatele:\n${lines.join('\n')}\n` : ''
 }
 
+/**
+ * Sestaví blok textu s posledním tělesným složením uživatele (svalová hmota, viscerální tuk,
+ * tělesný tuk) z jeho check-inů, pro vložení do promptu. checkIns musí být seřazené sestupně
+ * podle data (nejnovější první).
+ */
+export function buildBodyCompositionPrompt(checkIns) {
+  if (!checkIns?.length) return ''
+
+  const latest = checkIns[0]
+  const lines = []
+  if (latest.muscle_mass_kg != null) lines.push(`- svalová hmota: ${latest.muscle_mass_kg} kg`)
+  if (latest.visceral_fat != null) lines.push(`- viscerální tuk: ${latest.visceral_fat}`)
+  if (latest.body_fat_pct != null) lines.push(`- tělesný tuk: ${latest.body_fat_pct} %`)
+
+  const oldest = checkIns[checkIns.length - 1]
+  if (oldest !== latest && latest.muscle_mass_kg != null && oldest.muscle_mass_kg != null) {
+    const diff = Math.round((latest.muscle_mass_kg - oldest.muscle_mass_kg) * 10) / 10
+    lines.push(`- trend svalové hmoty za poslední check-iny: ${diff >= 0 ? '+' : ''}${diff} kg`)
+  }
+
+  return lines.length ? `\nNejnovější tělesné složení uživatele (z check-inů):\n${lines.join('\n')}\n` : ''
+}
+
 /** Vyextrahuje a naparsuje JSON z textové odpovědi AI (i pokud je obalený v ```json bloku). */
 export function parseAIJson(text) {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)

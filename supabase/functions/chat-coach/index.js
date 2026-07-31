@@ -1,6 +1,7 @@
 import { corsHeaders } from '../_shared/cors.js'
 import { calcProfileTargets } from '../_shared/calc.js'
 import {
+  buildBodyCompositionPrompt,
   buildPreferencesPrompt,
   callAIRaw,
   checkRateLimit,
@@ -118,9 +119,11 @@ const TOOLS = [
   },
 ]
 
-function buildSystemPrompt({ profile, targets, mealPlan, trainingPlan }) {
+function buildSystemPrompt({ profile, targets, mealPlan, trainingPlan, checkIns }) {
   const parts = [
-    'Jsi přátelský AI fitness a výživový kouč v appce Fitness AI Coach. Mluvíš česky, věcně a stručně.',
+    'Jsi přátelský AI fitness a výživový kouč v appce Fitness AI Coach — chováš se jako profesionální ' +
+      'výživový poradce a fitness trenér, radíš na základě všech dostupných dat o uživateli.',
+    'Mluvíš česky, věcně a stručně.',
     'Odpovídáš na dotazy o jídelníčku, tréninku a progresu uživatele, vysvětluješ a radíš.',
     'Pokud se s uživatelem jasně shodnete na konkrétní změně jídelníčku nebo tréninku, ulož ji ' +
       'zavoláním nástroje update_meal_plan / update_training_plan — jinak nástroje nevolej.',
@@ -131,7 +134,8 @@ function buildSystemPrompt({ profile, targets, mealPlan, trainingPlan }) {
     parts.push(
       `Profil uživatele: cíl ${profile.goal}, denní cíl ${targets.calories} kcal ` +
         `(B ${targets.protein.g} g, T ${targets.fat.g} g, S ${targets.carbs.g} g).` +
-        buildPreferencesPrompt(profile)
+        buildPreferencesPrompt(profile) +
+        buildBodyCompositionPrompt(checkIns ?? [])
     )
   } else {
     parts.push('Uživatel zatím nemá vyplněný profil — doporuč mu to udělat, pokud se ptá na jídelníček/trénink.')
@@ -172,30 +176,41 @@ Deno.serve(async (req) => {
       return jsonResponse(400, { error: `Zpráva je příliš dlouhá (max ${MAX_MESSAGE_LENGTH} znaků).` }, corsHeaders)
     }
 
-    const [{ data: profile }, { data: mealPlan }, { data: trainingPlan }, { data: history, error: historyError }] =
-      await Promise.all([
-        supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle(),
-        supabase
-          .from('meal_plans')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('training_plans')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        supabase
-          .from('chat_messages')
-          .select('role, content')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(HISTORY_LIMIT),
-      ])
+    const [
+      { data: profile },
+      { data: mealPlan },
+      { data: trainingPlan },
+      { data: checkIns },
+      { data: history, error: historyError },
+    ] = await Promise.all([
+      supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle(),
+      supabase
+        .from('meal_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('training_plans')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('check_ins')
+        .select('date, body_fat_pct, muscle_mass_kg, visceral_fat')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .limit(3),
+      supabase
+        .from('chat_messages')
+        .select('role, content')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(HISTORY_LIMIT),
+    ])
     if (historyError) throw historyError
 
     const targets = profile
@@ -214,7 +229,7 @@ Deno.serve(async (req) => {
       .insert({ user_id: user.id, role: 'user', content: message })
     if (insertUserMsgError) throw insertUserMsgError
 
-    const systemPrompt = buildSystemPrompt({ profile, targets, mealPlan, trainingPlan })
+    const systemPrompt = buildSystemPrompt({ profile, targets, mealPlan, trainingPlan, checkIns })
     const messages = [
       { role: 'system', content: systemPrompt },
       ...[...(history ?? [])].reverse().map((m) => ({ role: m.role, content: m.content })),

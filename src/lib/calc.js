@@ -131,6 +131,35 @@ export function calcBodyFatTrend(checkIns, days = 30) {
   }
 }
 
+/** Obecný trend libovolného číselného pole check-inu — stejná logika jako calcWeightChange/calcBodyFatTrend. */
+function calcFieldTrend(checkIns, field, days = 30) {
+  const withField = checkIns.filter((c) => c[field] != null)
+  if (withField.length < 2) return null
+
+  const latest = withField[withField.length - 1]
+  const cutoff = new Date(latest.date)
+  cutoff.setDate(cutoff.getDate() - days)
+  const base = withField.find((c) => new Date(c.date) >= cutoff) ?? withField[0]
+
+  if (base === latest) return null
+
+  return {
+    change: round1(latest[field] - base[field]),
+    fromDate: base.date,
+    toDate: latest.date,
+  }
+}
+
+/** Trend svalové hmoty (kg) za posledních `days` dnů — z InBody/kaliper check-inů. */
+export function calcMuscleMassTrend(checkIns, days = 30) {
+  return calcFieldTrend(checkIns, 'muscle_mass_kg', days)
+}
+
+/** Trend viscerálního tuku za posledních `days` dnů — z InBody check-inů. */
+export function calcVisceralFatTrend(checkIns, days = 30) {
+  return calcFieldTrend(checkIns, 'visceral_fat', days)
+}
+
 /**
  * Počet po sobě jdoucích check-inů (od nejnovějšího) s mezerou nejvýš
  * `maxGapDays` dnů mezi sousedními záznamy — přibližuje pravidelnost trackingu.

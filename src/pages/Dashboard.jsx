@@ -6,7 +6,9 @@ import {
   calcAdaptiveRecommendation,
   calcBodyFatTrend,
   calcCheckInStreak,
+  calcMuscleMassTrend,
   calcProfileTargets,
+  calcVisceralFatTrend,
   calcWeightChange,
 } from '../lib/calc'
 import { Card, EmptyState, Eyebrow, MacroSplitBar, Metric, MiniMacro } from '../components/ui'
@@ -16,6 +18,8 @@ import { DashboardSkeleton } from '../components/Skeleton'
 const CHART_METRICS = {
   weight: { label: 'Váha', field: 'weight_kg', unit: 'kg', color: '#C9824A' },
   bodyFat: { label: 'Tělesný tuk', field: 'body_fat_pct', unit: '%', color: '#4FA398' },
+  muscleMass: { label: 'Svalová hmota', field: 'muscle_mass_kg', unit: 'kg', color: '#8B93A7' },
+  visceralFat: { label: 'Viscerální tuk', field: 'visceral_fat', unit: '', color: '#C0524A' },
 }
 
 export default function Dashboard({ user }) {
@@ -32,7 +36,7 @@ export default function Dashboard({ user }) {
         supabase.from('profiles').select('*').eq('user_id', user.id).maybeSingle(),
         supabase
           .from('check_ins')
-          .select('date, weight_kg, body_fat_pct')
+          .select('date, weight_kg, body_fat_pct, muscle_mass_kg, visceral_fat')
           .eq('user_id', user.id)
           .order('date', { ascending: true })
           .limit(60),
@@ -75,6 +79,8 @@ export default function Dashboard({ user }) {
 
   const weightChange = calcWeightChange(checkIns)
   const bodyFatTrend = calcBodyFatTrend(checkIns)
+  const muscleMassTrend = calcMuscleMassTrend(checkIns)
+  const visceralFatTrend = calcVisceralFatTrend(checkIns)
   const streak = calcCheckInStreak(checkIns)
   const recommendation = calcAdaptiveRecommendation({ checkIns, goal: profile.goal })
 
@@ -119,6 +125,28 @@ export default function Dashboard({ user }) {
           <Metric label="Streak" value={streak} unit="v řadě" tone="teal" />
         </Card>
       </div>
+
+      {(muscleMassTrend || visceralFatTrend) && (
+        <div className="grid grid-cols-2 gap-3">
+          {muscleMassTrend && (
+            <Card>
+              <Metric
+                label="Svaly (30 dní)"
+                value={`${muscleMassTrend.change > 0 ? '+' : ''}${muscleMassTrend.change}`}
+                unit="kg"
+              />
+            </Card>
+          )}
+          {visceralFatTrend && (
+            <Card>
+              <Metric
+                label="Viscerální tuk (30 dní)"
+                value={`${visceralFatTrend.change > 0 ? '+' : ''}${visceralFatTrend.change}`}
+              />
+            </Card>
+          )}
+        </div>
+      )}
 
       {recommendation && (
         <Card className="border-accent/40">

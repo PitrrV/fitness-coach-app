@@ -1,5 +1,5 @@
 import { corsHeaders } from '../_shared/cors.js'
-import { callAI, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
+import { buildBodyCompositionPrompt, callAI, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
 
 const TRAINING_PLAN_SCHEMA = `{
   "days": [
@@ -33,8 +33,16 @@ Deno.serve(async (req) => {
       return jsonResponse(400, { error: 'Nejdřív vyplň svůj profil.' }, corsHeaders)
     }
 
+    const { data: checkIns } = await supabase
+      .from('check_ins')
+      .select('date, body_fat_pct, muscle_mass_kg, visceral_fat')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
+      .limit(3)
+
     const prompt = `Sestav tréninkový plán na 4 tréninkové dny v týdnu pro uživatele s cílem
 "${profile.goal}", úrovní aktivity "${profile.activity_level}", věkem ${profile.age} let.
+${buildBodyCompositionPrompt(checkIns ?? [])}
 U každého cviku uveď počet sérií a rozsah opakování. Odpověz VÝHRADNĚ platným JSON přesně
 v této struktuře, bez dalšího textu:
 ${TRAINING_PLAN_SCHEMA}`

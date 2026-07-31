@@ -1,6 +1,14 @@
 import { corsHeaders } from '../_shared/cors.js'
 import { calcProfileTargets } from '../_shared/calc.js'
-import { buildPreferencesPrompt, callAI, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
+import {
+  buildBodyCompositionPrompt,
+  buildPreferencesPrompt,
+  callAI,
+  checkRateLimit,
+  jsonResponse,
+  parseAIJson,
+  verifyAuth,
+} from '../_shared/shared.js'
 
 const MEAL_PLAN_SCHEMA = `{
   "days": [
@@ -41,6 +49,13 @@ Deno.serve(async (req) => {
       return jsonResponse(400, { error: 'Nejdřív vyplň svůj profil.' }, corsHeaders)
     }
 
+    const { data: checkIns } = await supabase
+      .from('check_ins')
+      .select('date, body_fat_pct, muscle_mass_kg, visceral_fat')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
+      .limit(3)
+
     const body = await req.json().catch(() => ({}))
     const days = Math.min(7, Math.max(1, Number(body.days) || 1))
     const targets = calcProfileTargets({
@@ -56,7 +71,7 @@ Deno.serve(async (req) => {
 - cíl: ${profile.goal}
 - denní kalorie: ${targets.calories} kcal
 - makra: bílkoviny ${targets.protein.g} g, tuky ${targets.fat.g} g, sacharidy ${targets.carbs.g} g
-${buildPreferencesPrompt(profile)}
+${buildPreferencesPrompt(profile)}${buildBodyCompositionPrompt(checkIns ?? [])}
 Používej běžně dostupné potraviny v ČR. Rozděl každý den na 3–4 jídla, u každé položky uveď
 gramáž. Přidej souhrnný nákupní seznam za všechny dny (bez duplicit). Odpověz VÝHRADNĚ platným
 JSON přesně v této struktuře, bez dalšího textu:

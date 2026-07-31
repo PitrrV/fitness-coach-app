@@ -52,10 +52,22 @@ create table if not exists public.check_ins (
   chest_cm numeric,
   arm_cm numeric,
   thigh_cm numeric,
+  muscle_mass_kg numeric,
+  visceral_fat numeric,
+  measurement_source text not null default 'manual'
+    check (measurement_source in ('inbody', 'caliper', 'smart_scale', 'manual', 'unknown')),
   notes text,
   photo_path text,
   created_at timestamptz not null default now()
 );
+
+-- Idempotentní přidání sloupců pro už existující databáze.
+alter table public.check_ins add column if not exists muscle_mass_kg numeric;
+alter table public.check_ins add column if not exists visceral_fat numeric;
+alter table public.check_ins add column if not exists measurement_source text not null default 'manual';
+alter table public.check_ins drop constraint if exists check_ins_measurement_source_check;
+alter table public.check_ins add constraint check_ins_measurement_source_check
+  check (measurement_source in ('inbody', 'caliper', 'smart_scale', 'manual', 'unknown'));
 
 create index if not exists check_ins_user_date_idx on public.check_ins (user_id, date desc);
 

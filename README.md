@@ -7,7 +7,7 @@ Osobní fitness a výživový kouč s AI generovanými plány.
 - Frontend: React 18 + Vite + Tailwind (bez routeru, navigace přes tab state v `src/App.jsx`),
   nasazený staticky na GitHub Pages
 - Backend: Supabase (Auth, Postgres + RLS, Storage bucket `measurement-photos`)
-- AI: Supabase Edge Functions (`supabase/functions/`) jako proxy na Anthropic API — klíč jen
+- AI: Supabase Edge Functions (`supabase/functions/`) jako proxy na OpenAI API — klíč jen
   na serveru, nikdy ve frontendu
 
 ## Vývoj
@@ -37,7 +37,7 @@ Vyžaduje [Supabase CLI](https://supabase.com/docs/guides/cli):
 ```bash
 supabase login
 supabase link --project-ref <tvůj-project-ref>
-supabase secrets set ANTHROPIC_API_KEY=xxxxx
+supabase secrets set OPENAI_API_KEY=xxxxx
 supabase functions deploy generate-meal-plan
 supabase functions deploy generate-training-plan
 supabase functions deploy delete-account

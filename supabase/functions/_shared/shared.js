@@ -1,9 +1,9 @@
 // Sdílené utility pro Supabase Edge Functions — auth, rate limit, volání
-// Anthropic API, parsování JSON. Deno runtime.
+// OpenAI API, parsování JSON. Deno runtime.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export const DAILY_LIMIT = 15
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6'
+const OPENAI_MODEL = 'gpt-4o'
 
 export function jsonResponse(statusCode, body, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -75,27 +75,28 @@ export async function checkRateLimit(supabase, userId) {
   if (updateError) throw updateError
 }
 
-/** Zavolá Anthropic API a vrátí textovou odpověď. */
-export async function callAnthropic({ system, prompt, maxTokens = 4096 }) {
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+/** Zavolá OpenAI API a vrátí textovou odpověď. */
+export async function callAI({ system, prompt, maxTokens = 4096 }) {
+  const apiKey = Deno.env.get('OPENAI_API_KEY')
   if (!apiKey) {
     const err = new Error('Server není správně nakonfigurován (chybí API klíč).')
     err.statusCode = 500
     throw err
   }
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
+      model: OPENAI_MODEL,
       max_tokens: maxTokens,
-      system,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: prompt },
+      ],
     }),
   })
 
@@ -107,7 +108,7 @@ export async function callAnthropic({ system, prompt, maxTokens = 4096 }) {
   }
 
   const data = await res.json()
-  return data.content?.[0]?.text ?? ''
+  return data.choices?.[0]?.message?.content ?? ''
 }
 
 /** Vyextrahuje a naparsuje JSON z textové odpovědi AI (i pokud je obalený v ```json bloku). */

@@ -1,5 +1,5 @@
 import { corsHeaders } from '../_shared/cors.js'
-import { callAnthropic, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
+import { callAI, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
 
 const TRAINING_PLAN_SCHEMA = `{
   "days": [
@@ -39,7 +39,7 @@ U každého cviku uveď počet sérií a rozsah opakování. Odpověz VÝHRADNĚ
 v této struktuře, bez dalšího textu:
 ${TRAINING_PLAN_SCHEMA}`
 
-    const text = await callAnthropic({
+    const text = await callAI({
       system: 'Jsi trenér silového tréninku. Odpovídáš vždy pouze validním JSON bez dalšího komentáře.',
       prompt,
     })

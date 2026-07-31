@@ -1,6 +1,6 @@
 import { corsHeaders } from '../_shared/cors.js'
 import { calcProfileTargets } from '../_shared/calc.js'
-import { callAnthropic, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
+import { callAI, checkRateLimit, jsonResponse, parseAIJson, verifyAuth } from '../_shared/shared.js'
 
 const MEAL_PLAN_SCHEMA = `{
   "days": [
@@ -62,7 +62,7 @@ gramáž. Přidej souhrnný nákupní seznam za všechny dny (bez duplicit). Odp
 JSON přesně v této struktuře, bez dalšího textu:
 ${MEAL_PLAN_SCHEMA}`
 
-    const text = await callAnthropic({
+    const text = await callAI({
       system: 'Jsi výživový poradce. Odpovídáš vždy pouze validním JSON bez dalšího komentáře.',
       prompt,
     })

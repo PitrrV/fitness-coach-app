@@ -9,12 +9,14 @@ import { useChecklist } from '../lib/useChecklist'
 
 const WEEKDAYS = ['Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota', 'Neděle']
 const WEEKDAYS_SHORT = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
+const MEALS_PER_DAY_OPTIONS = [3, 4, 5]
 
 export default function MealPlan({ user }) {
   const [plan, setPlan] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [activeDay, setActiveDay] = useState(1)
+  const [mealsPerDay, setMealsPerDay] = useState(4)
   const toast = useToast()
   const [checkedItems, toggleItem] = useChecklist(`meal-checks-${plan?.id ?? 'none'}`)
 
@@ -45,7 +47,7 @@ export default function MealPlan({ user }) {
   async function handleGenerate() {
     setGenerating(true)
     try {
-      const result = await callFunction('generate-meal-plan', {})
+      const result = await callFunction('generate-meal-plan', { mealsPerDay })
       setPlan(result.plan)
       setActiveDay(1)
       toast.success('Jídelníček vygenerován.')
@@ -66,11 +68,28 @@ export default function MealPlan({ user }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Eyebrow>Jídelníček na týden (Po–Ne)</Eyebrow>
-        <Button variant="secondary" onClick={handleGenerate} loading={generating}>
-          <RefreshCw className="h-4 w-4" />
-          {plan ? 'Přegenerovat' : 'Vygenerovat'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-xl border border-border p-0.5">
+            {MEALS_PER_DAY_OPTIONS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setMealsPerDay(n)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium transition ${
+                  mealsPerDay === n ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text'
+                }`}
+              >
+                {n}j
+              </button>
+            ))}
+          </div>
+          <Button variant="secondary" onClick={handleGenerate} loading={generating}>
+            <RefreshCw className="h-4 w-4" />
+            {plan ? 'Přegenerovat' : 'Vygenerovat'}
+          </Button>
+        </div>
       </div>
+      <p className="text-xs text-muted">Počet jídel na den — nastav před generováním</p>
 
       {!plan && !generating && (
         <EmptyState

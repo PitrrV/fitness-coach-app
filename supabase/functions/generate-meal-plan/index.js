@@ -43,7 +43,7 @@ function isWithinTolerance(planJson, targetCalories) {
   })
 }
 
-function buildPrompt({ profile, targets, preferences, bodyComposition, correction }) {
+function buildPrompt({ profile, targets, preferences, bodyComposition, mealsPerDay, correction }) {
   const min = Math.round(targets.calories * (1 - TOLERANCE))
   const max = Math.round(targets.calories * (1 + TOLERANCE))
   return `Sestav jídelníček na celý týden — přesně ${DAYS} dní, den 1 = pondělí až den 7 = neděle
@@ -57,9 +57,10 @@ Než odpovíš, u každého dne sečti kalorie všech jídel a uprav gramáže t
 skutečně spadal — teprve pak do "totals" daného dne napiš přepočítaný součet.
 
 Používej běžně dostupné potraviny v ČR, přes týden střídej jídla (ať se nedokola neopakuje totéž).
-Rozděl každý den na 3–4 jídla, u každé položky uveď gramáž. Přidej souhrnný nákupní seznam za
-všechny dny dohromady (bez duplicit). Odpověz VÝHRADNĚ platným JSON přesně v této struktuře,
-bez dalšího textu:
+Každý den rozděl na PŘESNĚ ${mealsPerDay} jídel (ne víc, ne míň) a rozlož mezi ně cílové kalorie a
+makra rovnoměrně a smysluplně (větší jídla přes den, menší svačiny). U každé položky uveď gramáž.
+Přidej souhrnný nákupní seznam za všechny dny dohromady (bez duplicit). Odpověz VÝHRADNĚ platným
+JSON přesně v této struktuře, bez dalšího textu:
 ${MEAL_PLAN_SCHEMA}${
     correction
       ? `\n\nPředchozí pokus měl součet kalorií u některých dnů mimo rozmezí ${min}–${max} kcal. Uprav gramáže a přepočítej totals znovu, tentokrát přesně.`
@@ -105,19 +106,25 @@ Deno.serve(async (req) => {
       goal: profile.goal,
     })
 
+    const body = await req.json().catch(() => ({}))
+    const mealsPerDay = [3, 4, 5].includes(Number(body.mealsPerDay)) ? Number(body.mealsPerDay) : 4
+
     const preferences = buildPreferencesPrompt(profile)
     const bodyComposition = buildBodyCompositionPrompt(checkIns ?? [])
     const system = 'Jsi výživový poradce. Odpovídáš vždy pouze validním JSON bez dalšího komentáře.'
 
     let planJson = parseAIJson(
-      await callAI({ system, prompt: buildPrompt({ profile, targets, preferences, bodyComposition }) })
+      await callAI({
+        system,
+        prompt: buildPrompt({ profile, targets, preferences, bodyComposition, mealsPerDay }),
+      })
     )
 
     if (!isWithinTolerance(planJson, targets.calories)) {
       planJson = parseAIJson(
         await callAI({
           system,
-          prompt: buildPrompt({ profile, targets, preferences, bodyComposition, correction: true }),
+          prompt: buildPrompt({ profile, targets, preferences, bodyComposition, mealsPerDay, correction: true }),
         })
       )
     }

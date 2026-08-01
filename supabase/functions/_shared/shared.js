@@ -97,6 +97,9 @@ export async function callAIRaw({ messages, tools, maxTokens = 4096 }) {
       // gpt-5.6-luna (a další novější modely) odmítají starší 'max_tokens' —
       // vyžadují 'max_completion_tokens'. Starším modelům (gpt-4o apod.) nevadí obojí.
       max_completion_tokens: maxTokens,
+      // gpt-5.6-luna je reasoning model — s function tools v /v1/chat/completions
+      // vyžaduje explicitně reasoning_effort 'none' (jinak 400 Bad Request).
+      reasoning_effort: 'none',
       messages,
       ...(tools ? { tools, tool_choice: 'auto' } : {}),
     }),

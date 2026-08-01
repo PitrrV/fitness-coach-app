@@ -94,7 +94,9 @@ export async function callAIRaw({ messages, tools, maxTokens = 4096 }) {
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      max_tokens: maxTokens,
+      // gpt-5.6-luna (a další novější modely) odmítají starší 'max_tokens' —
+      // vyžadují 'max_completion_tokens'. Starším modelům (gpt-4o apod.) nevadí obojí.
+      max_completion_tokens: maxTokens,
       messages,
       ...(tools ? { tools, tool_choice: 'auto' } : {}),
     }),

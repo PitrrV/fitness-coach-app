@@ -31,39 +31,61 @@ const MEAL_PLAN_SCHEMA = `{
   "shoppingList": ["položka 1", "položka 2"]
 }`
 
-const TOLERANCE = 0.08 // ±8 % od cílových kalorií za den
+const CALORIE_TOLERANCE = 0.08 // ±8 % od cílových kalorií za den
+const MACRO_TOLERANCE = 0.15 // ±15 % od cílových gramů makra za den
 
-/** Zkontroluje, jestli je součet kalorií KAŽDÉHO dne v toleranci od cíle. */
-function isWithinTolerance(planJson, targetCalories) {
+/** Zkontroluje, jestli jsou kalorie I VŠECHNA TŘI makra KAŽDÉHO dne v toleranci od cíle. */
+function isWithinTolerance(planJson, targets) {
   const days = planJson?.days
   if (!Array.isArray(days) || days.length === 0) return false
   return days.every((d) => {
-    const kcal = d?.totals?.kcal
-    return typeof kcal === 'number' && Math.abs(kcal - targetCalories) / targetCalories <= TOLERANCE
+    const t = d?.totals
+    if (!t) return false
+    const within = (value, target, tolerance) =>
+      typeof value === 'number' && Math.abs(value - target) / target <= tolerance
+    return (
+      within(t.kcal, targets.calories, CALORIE_TOLERANCE) &&
+      within(t.protein, targets.protein.g, MACRO_TOLERANCE) &&
+      within(t.fat, targets.fat.g, MACRO_TOLERANCE) &&
+      within(t.carbs, targets.carbs.g, MACRO_TOLERANCE)
+    )
   })
 }
 
 function buildPrompt({ profile, targets, preferences, bodyComposition, mealsPerDay, correction }) {
-  const min = Math.round(targets.calories * (1 - TOLERANCE))
-  const max = Math.round(targets.calories * (1 + TOLERANCE))
+  const calMin = Math.round(targets.calories * (1 - CALORIE_TOLERANCE))
+  const calMax = Math.round(targets.calories * (1 + CALORIE_TOLERANCE))
+  const proteinMin = Math.round(targets.protein.g * (1 - MACRO_TOLERANCE))
+  const proteinMax = Math.round(targets.protein.g * (1 + MACRO_TOLERANCE))
+  const fatMin = Math.round(targets.fat.g * (1 - MACRO_TOLERANCE))
+  const fatMax = Math.round(targets.fat.g * (1 + MACRO_TOLERANCE))
+  const carbsMin = Math.round(targets.carbs.g * (1 - MACRO_TOLERANCE))
+  const carbsMax = Math.round(targets.carbs.g * (1 + MACRO_TOLERANCE))
+
   return `Sestav jídelníček na celý týden — přesně ${DAYS} dní, den 1 = pondělí až den 7 = neděle
 (pole "weekday" u každého dne vyplň názvem dne v týdnu) — pro uživatele:
 - cíl: ${profile.goal}
 - denní kalorie: ${targets.calories} kcal
 - makra: bílkoviny ${targets.protein.g} g, tuky ${targets.fat.g} g, sacharidy ${targets.carbs.g} g
 ${preferences}${bodyComposition}
-DŮLEŽITÉ: Součet kalorií (totals.kcal) za KAŽDÝ jednotlivý den musí být v rozmezí ${min}–${max} kcal.
-Než odpovíš, u každého dne sečti kalorie všech jídel a uprav gramáže tak, aby součet do rozmezí
-skutečně spadal — teprve pak do "totals" daného dne napiš přepočítaný součet.
+DŮLEŽITÉ: Za KAŽDÝ jednotlivý den musí SOUČASNĚ platit:
+- kalorie (totals.kcal) v rozmezí ${calMin}–${calMax} kcal
+- bílkoviny (totals.protein) v rozmezí ${proteinMin}–${proteinMax} g
+- tuky (totals.fat) v rozmezí ${fatMin}–${fatMax} g
+- sacharidy (totals.carbs) v rozmezí ${carbsMin}–${carbsMax} g
+Než odpovíš, u každého dne sečti kalorie i makra všech jídel a uprav gramáže a skladbu potravin
+(víc/míň bílkovinných, tučných či sacharidových položek) tak, aby VŠECHNY čtyři hodnoty do
+rozmezí skutečně spadaly — teprve pak je napiš do "totals" daného dne.
 
 Používej běžně dostupné potraviny v ČR, přes týden střídej jídla (ať se nedokola neopakuje totéž).
-Každý den rozděl na PŘESNĚ ${mealsPerDay} jídel (ne víc, ne míň) a rozlož mezi ně cílové kalorie a
-makra rovnoměrně a smysluplně (větší jídla přes den, menší svačiny). U každé položky uveď gramáž.
+Každý den rozděl na PŘESNĚ ${mealsPerDay} jídel (ne víc, ne míň). U každé položky uveď gramáž.
 Přidej souhrnný nákupní seznam za všechny dny dohromady (bez duplicit). Odpověz VÝHRADNĚ platným
 JSON přesně v této struktuře, bez dalšího textu:
 ${MEAL_PLAN_SCHEMA}${
     correction
-      ? `\n\nPředchozí pokus měl součet kalorií u některých dnů mimo rozmezí ${min}–${max} kcal. Uprav gramáže a přepočítej totals znovu, tentokrát přesně.`
+      ? `\n\nPředchozí pokus měl u některých dnů kalorie nebo některé z maker (bílkoviny/tuky/
+sacharidy) mimo požadovaná rozmezí. Uprav gramáže a poměr potravin a přepočítej totals znovu,
+tentokrát přesně pro kalorie i všechna tři makra současně.`
       : ''
   }`
 }
@@ -120,7 +142,7 @@ Deno.serve(async (req) => {
       })
     )
 
-    if (!isWithinTolerance(planJson, targets.calories)) {
+    if (!isWithinTolerance(planJson, targets)) {
       planJson = parseAIJson(
         await callAI({
           system,
